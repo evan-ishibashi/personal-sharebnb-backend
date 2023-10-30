@@ -9,7 +9,7 @@ load_dotenv()
 AWS_ACCESS_KEY = os.environ['ACCESS_KEY']
 AWS_SECRET_KEY = os.environ['SECRET_KEY']
 
-bucket = 'be-sharebnb-listing-photos'
+bucket = 'eb-sharebnb-listing-photos'
 
 
 def upload_file(file_name, bucket, object_name=None):
@@ -19,6 +19,7 @@ def upload_file(file_name, bucket, object_name=None):
         object_name = os.path.basename(file_name)
 
     # Upload the file
+    breakpoint()
     s3_client = boto3.client(
         's3',
         'us-west-1',
@@ -43,7 +44,12 @@ def get_file_url(bucket, object_name):
     :return: URL of the uploaded file
     """
 
-    s3_client = boto3.client('s3')
+    s3_client = boto3.client(
+        's3',
+        'us-west-1',
+        aws_access_key_id=AWS_ACCESS_KEY,
+        aws_secret_access_key=AWS_SECRET_KEY,
+    )
     location = s3_client.get_bucket_location(
         Bucket=bucket)['LocationConstraint']
     url = f"https://{bucket}.s3.{location}.amazonaws.com/{object_name}"

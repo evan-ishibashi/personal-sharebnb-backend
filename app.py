@@ -214,6 +214,8 @@ def create_listing():
                           details=details,
                           user_id=user_id)
 
+
+    print("new_listing in create route", new_listing)
     db.session.add(new_listing)
     db.session.commit()
 
