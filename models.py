@@ -79,6 +79,7 @@ class Listing(db.Model):
     )
 
     photos = db.relationship('Photo', backref='listings')
+    host = db.relationship('User', backref='listings')
 
     booked_listings = db.relationship('Booking', backref='listings')
 

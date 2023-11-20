@@ -19,7 +19,6 @@ def upload_file(file_name, bucket, object_name=None):
         object_name = os.path.basename(file_name)
 
     # Upload the file
-    breakpoint()
     s3_client = boto3.client(
         's3',
         'us-west-1',

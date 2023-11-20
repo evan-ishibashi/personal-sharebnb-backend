@@ -14,7 +14,11 @@ from werkzeug.utils import secure_filename
 from forms import CSRFProtection
 import bucket_testing
 from flask_cors import CORS, cross_origin
-from authlib.jose import jwt
+
+from flask_jwt_extended import create_access_token
+from flask_jwt_extended import get_jwt_identity
+from flask_jwt_extended import jwt_required
+from flask_jwt_extended import JWTManager
 
 load_dotenv()
 
@@ -30,6 +34,8 @@ app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get(
 app.config['SQLALCHEMY_ECHO'] = False
 app.config['DEBUG_TB_INTERCEPT_REDIRECTS'] = True
 app.config['SECRET_KEY'] = os.environ['SECRET_KEY']
+app.config["JWT_SECRET_KEY"] = "super-secret"  # Change this!
+jwt = JWTManager(app)
 # toolbar = DebugToolbarExtension(app)
 
 connect_db(app)
@@ -38,77 +44,91 @@ connect_db(app)
 ##############################################################################
 # User signup/login/logout
 
+# Create a route to authenticate your users and return JWTs. The
+# create_access_token() function is used to actually generate the JWT.
+# @app.route("/login", methods=["POST"])
+# def login():
+#     username = request.json.get("username", None)
+#     password = request.json.get("password", None)
+#     if username != "test" or password != "test":
+#         return jsonify({"msg": "Bad username or password"}), 401
 
-@app.before_request
-def add_user_to_g():
-    """If we're logged in, add curr user to Flask global."""
-    if CURR_USER_KEY in session:
-        g.user = User.query.get(session[CURR_USER_KEY])
-    else:
-        g.user = None
-
-
-@app.before_request
-def add_csrf_only_form():
-    """Add a CSRF-only form so that every route can use it."""
-
-    g.csrf_form = CSRFProtection()
+#     access_token = create_access_token(identity=username)
+#     return jsonify(access_token=access_token)
 
 
-def do_login(user):
-    """Log in user.
-
-    Assigns user id to session."""
-    session[CURR_USER_KEY] = user.id
 
 
-def do_logout():
-    """Log out user."""
+# @app.before_request
+# def add_user_to_g():
+#     """If we're logged in, add curr user to Flask global."""
+#     if CURR_USER_KEY in session:
+#         g.user = User.query.get(session[CURR_USER_KEY])
+#     else:
+#         g.user = None
 
-    if CURR_USER_KEY in session:
-        del session[CURR_USER_KEY]
+
+# @app.before_request
+# def add_csrf_only_form():
+#     """Add a CSRF-only form so that every route can use it."""
+
+#     g.csrf_form = CSRFProtection()
 
 
-@app.route('/signup', methods=["GET", "POST"])
-@cross_origin(supports_credentials=True)
-def signup():
-    """Handle user signup.
+# def do_login(user):
+#     """Log in user.
 
-    Create new user and add to DB.
+#     Assigns user id to session."""
+#     session[CURR_USER_KEY] = user.id
 
-    Returns JSON {'users': {id, first_name, last_name}}
 
-    If the there already is a user with that username: flash message
-    """
-    do_logout()
+# def do_logout():
+#     """Log out user."""
 
-    first_name = request.json['first_name']
-    last_name = request.json['last_name']
-    email = request.json['email']
-    password = request.json['password']
-    username = request.json['username']
+#     if CURR_USER_KEY in session:
+#         del session[CURR_USER_KEY]
 
-    if (User.query.filter_by(email=email).first()):
-        msg = 'Email is already registered.'
-        return jsonify(msg=msg)
 
-    if (User.query.filter_by(username=username).first()):
-        msg = 'Username is taken. Please choose a different one.'
-        return jsonify(msg=msg)
+# @app.route('/signup', methods=["GET", "POST"])
+# @cross_origin(supports_credentials=True)
+# def signup():
+#     """Handle user signup.
 
-    new_user = User.signup(
-        first_name=first_name,
-        last_name=last_name,
-        email=email,
-        password=password,
-        username=username
-    )
+#     Create new user and add to DB.
 
-    db.session.commit()
-    do_login(new_user)
-    serialized = new_user.serialize()
+#     Returns JSON {'users': {id, first_name, last_name}}
 
-    return (jsonify(user=serialized), 201)
+#     If the there already is a user with that username: flash message
+#     """
+#     do_logout()
+
+#     first_name = request.json['first_name']
+#     last_name = request.json['last_name']
+#     email = request.json['email']
+#     password = request.json['password']
+#     username = request.json['username']
+
+#     if (User.query.filter_by(email=email).first()):
+#         msg = 'Email is already registered.'
+#         return jsonify(msg=msg)
+
+#     if (User.query.filter_by(username=username).first()):
+#         msg = 'Username is taken. Please choose a different one.'
+#         return jsonify(msg=msg)
+
+#     new_user = User.signup(
+#         first_name=first_name,
+#         last_name=last_name,
+#         email=email,
+#         password=password,
+#         username=username
+#     )
+
+#     db.session.commit()
+#     do_login(new_user)
+#     serialized = new_user.serialize()
+
+#     return (jsonify(user=serialized), 201)
 
 
 @app.route('/login', methods=["GET", "POST"])
@@ -116,33 +136,35 @@ def signup():
 def login():
     """Handle user login
 
-    Returns JSON {"user": {id, first_name, last_name, email, username}}"""
+    Returns JSON {"user": {id, jwt, first_name, last_name, email, username}}"""
     username = request.json['username']
     password = request.json['password']
 
     valid_user = User.authenticate(username, password)
 
     if valid_user:
-        do_login(valid_user)
+        access_token = create_access_token(identity=username)
         serialized = valid_user.serialize()
+        serialized["jwt"] = access_token
+        print("serialized in login", serialized)
         return jsonify(user=serialized)
 
     return jsonify(msg='Invalid credentials.')
 
 
-@app.post('/logout')
-def logout():
-    """Handle logout of user and redirect to homepage."""
+# @app.post('/logout')
+# def logout():
+#     """Handle logout of user and redirect to homepage."""
 
-    # form = g.csrf_form
+#     # form = g.csrf_form
 
-    if g.user:
-        g.user = None
-        do_logout()
-        msg = 'Logged out successfully'
-        return jsonify(msg=msg)
+#     if g.user:
+#         g.user = None
+#         do_logout()
+#         msg = 'Logged out successfully'
+#         return jsonify(msg=msg)
 
-    return jsonify(msg='You are not logged in')
+#     return jsonify(msg='You are not logged in')
 
 ##############################################################################
 # General users routes:
@@ -163,12 +185,12 @@ def get_all_users():
 
 
 @app.get('/listings')
+@jwt_required()
 def get_all_listings():
     """Returns list of listings.
 
     Can take a 'q' param in querystring to search for listing.
     """
-    print("g.user in listings route", g.user)
     search = request.args.get('q')
 
     if not search:
@@ -214,8 +236,6 @@ def create_listing():
                           details=details,
                           user_id=user_id)
 
-
-    print("new_listing in create route", new_listing)
     db.session.add(new_listing)
     db.session.commit()
 
