@@ -143,11 +143,26 @@ def login():
     valid_user = User.authenticate(username, password)
 
     if valid_user:
-        access_token = create_access_token(identity=username)
+        access_token = create_access_token(identity=valid_user.id)
         serialized = valid_user.serialize()
         serialized["jwt"] = access_token
-        print("serialized in login", serialized)
+        print(serialized)
         return jsonify(user=serialized)
+
+    return jsonify(msg='Invalid credentials.')
+
+@app.route("/getuser", methods=["GET"])
+@jwt_required()
+def protected():
+    # Access the identity of the current user with get_jwt_identity
+    current_user_id = get_jwt_identity()
+    current_user = User.query.get_or_404(current_user_id)
+    print("current user in getuser", current_user)
+
+    serialized = current_user.serialize()
+
+    if current_user_id and current_user:
+        return jsonify(serialized), 200
 
     return jsonify(msg='Invalid credentials.')
 
@@ -171,6 +186,7 @@ def login():
 
 
 @app.get('/users')
+@jwt_required()
 def get_all_users():
     """Returns list of users."""
 
@@ -205,6 +221,7 @@ def get_all_listings():
 
 
 @app.get('/listings/<int:id>')
+@jwt_required()
 def get_listing(id):
     """Returns Details of Listing
 
@@ -218,6 +235,7 @@ def get_listing(id):
 
 
 @app.post('/listings')
+@jwt_required()
 # @cross_origin()
 def create_listing():
     """Endpoint for creating new listing"""
