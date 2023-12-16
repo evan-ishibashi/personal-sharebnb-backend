@@ -88,7 +88,6 @@ class Listing(db.Model):
 
         return {
             "id": self.id,
-            "jwt": self.jwt,
             "name": self.name,
             "price": self.price,
             "details": self.details,
