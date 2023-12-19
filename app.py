@@ -106,49 +106,53 @@ connect_db(app)
 #         del session[CURR_USER_KEY]
 
 
-# @app.route('/signup', methods=["GET", "POST"])
-# @cross_origin(supports_credentials=True)
-# def signup():
-#     """Handle user signup.
+@app.route('/signup', methods=["GET", "POST"])
+@cross_origin(supports_credentials=True)
+def signup():
+    """Handle user signup.
 
-#     Create new user and add to DB.
+    Create new user and add to DB.
 
-#     Returns JSON {'users': {id, first_name, last_name}}
+    Returns JSON {"user": {id, jwt, first_name, last_name, email, username}}
 
-#     If the there already is a user with that username: flash message
-#     """
-#     do_logout()
+    If the there already is a user with that username: flash message
+    """
 
-#     first_name = request.json['first_name']
-#     last_name = request.json['last_name']
-#     email = request.json['email']
-#     password = request.json['password']
-#     username = request.json['username']
+    first_name = request.json['first_name']
+    last_name = request.json['last_name']
+    email = request.json['email']
+    password = request.json['password']
+    username = request.json['username']
 
-#     if (User.query.filter_by(email=email).first()):
-#         msg = 'Email is already registered.'
-#         return jsonify(msg=msg)
+    if (User.query.filter_by(email=email).first()):
+        msg = 'Email is already registered.'
+        return jsonify(msg=msg)
 
-#     if (User.query.filter_by(username=username).first()):
-#         msg = 'Username is taken. Please choose a different one.'
-#         return jsonify(msg=msg)
+    if (User.query.filter_by(username=username).first()):
+        msg = 'Username is taken. Please choose a different one.'
+        return jsonify(msg=msg)
 
-#     new_user = User.signup(
-#         first_name=first_name,
-#         last_name=last_name,
-#         email=email,
-#         password=password,
-#         username=username
-#     )
+    new_user = User.signup(
+        first_name=first_name,
+        last_name=last_name,
+        email=email,
+        password=password,
+        username=username
+    )
 
-#     db.session.commit()
-#     do_login(new_user)
-#     serialized = new_user.serialize()
+    if new_user:
+        db.session.commit()
+        access_token = create_access_token(identity=new_user.id)
+        serialized = new_user.serialize()
+        serialized["jwt"] = access_token
+        print("new registered user successful", serialized)
+        return jsonify(user=serialized)
 
-#     return (jsonify(user=serialized), 201)
+
+    return jsonify(msg='Register failed')
 
 
-@app.route('/login', methods=["GET", "POST"])
+@app.route('/login', methods=["POST"])
 @cross_origin(supports_credentials=True)
 def login():
     """Handle user login
@@ -163,7 +167,7 @@ def login():
         access_token = create_access_token(identity=valid_user.id)
         serialized = valid_user.serialize()
         serialized["jwt"] = access_token
-        print(serialized)
+        print("logged in user successful", serialized)
         return jsonify(user=serialized)
 
     return jsonify(msg='Invalid credentials.')
